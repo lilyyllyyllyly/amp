@@ -1,5 +1,5 @@
 COMP=clang
-OPTIONS=-Wall -Wextra -Werror -O3
+OPTIONS=-Wall -Wextra -Werror -Wno-unused-parameter -O3
 DEBUG=-fsanitize=address,undefined -g3
 
 SOURCES=main.c
