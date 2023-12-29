@@ -4,12 +4,17 @@
 #include <signal.h>
 
 #include <mpv/client.h>
+#include <GLFW/glfw3.h>
 
-#define NO_TIMEOUT -1
 #define SEEK "5" // seconds to seek in song
+
+#define WIDTH  800
+#define HEIGHT 600
 
 mpv_handle* mpv = NULL;
 int wakeup = 0;
+
+GLFWwindow* win = NULL;
 
 void handle_interrupt(int signal) {
 	puts("\nReceived interrupt signal, ending event loop...");
@@ -66,6 +71,52 @@ void seek_song(char* seek_secs) {
 	printf("INFO: sent command \'%s %s\'\n", args[0], args[1]);
 }
 
+void update_mpv() {
+	mpv_event* ev = mpv_wait_event(mpv, 0);
+	if (ev->event_id == MPV_EVENT_NONE) return;
+
+	printf("INFO: got event with id %d\n", ev->event_id);
+	if (ev->error < 0) {
+		fprintf(stderr, "WARNING: event with id %d had error with value %d./n", ev->event_id, ev->error);
+		return;
+	}
+}
+
+void handle_keyevent(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (action != GLFW_PRESS) return;
+
+	switch (key) {
+		case GLFW_KEY_SPACE: pause_song(); break;
+		default: break;
+	}
+}
+
+void init_ui() {
+	// Initializing glfw
+	if (!glfwInit()) {
+		fprintf(stderr, "ERROR: failed to init GLFW.\n");
+		exit(EXIT_FAILURE);
+	}
+	atexit(glfwTerminate);
+
+	// Creating window
+	win = glfwCreateWindow(WIDTH, HEIGHT, "amp - A Music Player", NULL, NULL);
+	if (!win) {
+		fprintf(stderr, "ERROR: failed to create window.");
+		exit(EXIT_FAILURE);
+	}
+	glfwMakeContextCurrent(win);
+
+	// Keyboard key callback
+	glfwSetKeyCallback(win, handle_keyevent);
+}
+
+void draw() {
+	glClear(GL_COLOR_BUFFER_BIT);
+	glfwSwapBuffers(win);
+	glfwPollEvents();
+}
+
 int main(int argc, char* argv[]) {
 	if (argc < 2) {
 		fprintf(stderr, "ERROR: no music file given.\n");
@@ -73,24 +124,18 @@ int main(int argc, char* argv[]) {
 	}
 
 	init_mpv();
+	init_ui();
 
 	// Start playing music file
 	const char* args[] = {"loadfile", argv[1], "append-play"};
 	mpv_command(mpv, args);
 	printf("INFO: sent command \'%s %s %s\'\n", args[0], args[1], args[2]);
 
-	// Event loop
-	signal(SIGINT, handle_interrupt); // Stop event loop on SIGINT
-	mpv_event* ev;
-	while (!wakeup) {
-		ev = mpv_wait_event(mpv, NO_TIMEOUT);
-		if (ev->event_id == MPV_EVENT_NONE) continue;
-
-		printf("INFO: got event with id %d\n", ev->event_id);
-		if (ev->error < 0) {
-			fprintf(stderr, "WARNING: event with id %d had error with value %d./n", ev->event_id, ev->error);
-			continue;
-		}
+	// Main loop
+	signal(SIGINT, handle_interrupt); // Stop mpv event loop on SIGINT
+	while (!wakeup && !glfwWindowShouldClose(win)) {
+		update_mpv();
+		draw();
 	}
 
 	puts("Quitting.");

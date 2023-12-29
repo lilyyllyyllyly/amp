@@ -4,7 +4,7 @@ DEBUG=-fsanitize=address,undefined -g3
 
 SOURCES=main.c
 OUTPUT=amp
-LIBS=-lmpv
+LIBS=-lmpv -lglfw -lGL
 
 final:
 	${COMP} ${OPTIONS} ${LIBS} ${SOURCES} -o ${OUTPUT}
