@@ -22,6 +22,20 @@ void handle_keyevent(GLFWwindow* window, int key, int scancode, int action, int 
 
 	switch (key) {
 		case GLFW_KEY_SPACE: pause_song(); break;
+		case GLFW_KEY_LEFT:
+			if (mods & GLFW_MOD_CONTROL) {
+				prev_song();
+			} else {
+				seek_song("-"SEEK);
+			}
+		break;
+		case GLFW_KEY_RIGHT:
+			if (mods & GLFW_MOD_CONTROL) {
+				next_song();
+			} else {
+				seek_song(SEEK);
+			}
+		break;
 		default: break;
 	}
 }
