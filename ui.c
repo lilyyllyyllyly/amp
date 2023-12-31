@@ -8,13 +8,13 @@
 #define HEIGHT 600
 
 mpv_render_context* res;
-int win_w, win_h;
+int fb_w, fb_h;
 
 void handle_fbresize(GLFWwindow* window, int width, int height) {
-	win_w = width;
-	win_h = height;
+	fb_w = width;
+	fb_h = height;
 
-	glViewport(0, 0, win_w, win_h); // Resizing viewport
+	glViewport(0, 0, fb_w, fb_h); // Resizing viewport
 }
 
 void* get_proc_address(void* ctx, const char* name) {
@@ -41,8 +41,8 @@ void init_ui(GLFWwindow** win, mpv_handle* mpv) {
 	}
 	glfwMakeContextCurrent(*win);
 
-	// Getting width and height (and resize callback)
-	glfwGetFramebufferSize(*win, &win_w, &win_h);
+	// Getting width and height of the window framebuffer (and resize callback)
+	glfwGetFramebufferSize(*win, &fb_w, &fb_h);
 	glfwSetFramebufferSizeCallback(*win, handle_fbresize);
 
 	// Create mpv render context
@@ -69,7 +69,24 @@ void draw(GLFWwindow* win) {
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	// Draw mpv video
-	// TODO
+	mpv_opengl_fbo glfbo = {
+		.fbo = 0, // Default framebuffer (window)
+		.w = fb_w,
+		.h = fb_h,
+		.internal_format = 0, // Unknown
+	};
+
+	int flip_y = 1; // Defualt framebuffer has flipped Y
+
+	mpv_render_param render_params[] = {
+		(mpv_render_param){MPV_RENDER_PARAM_OPENGL_FBO, &glfbo},
+		(mpv_render_param){MPV_RENDER_PARAM_FLIP_Y, &flip_y},
+		(mpv_render_param){MPV_RENDER_PARAM_INVALID, NULL},
+	};
+
+	int err = mpv_render_context_render(res, render_params);
+	if (err) fprintf(stderr, "ERROR: an error occured on mpv_render_context_render. error code %d\n", err);
+	//
 
 	glfwSwapBuffers(win);
 	glfwPollEvents();

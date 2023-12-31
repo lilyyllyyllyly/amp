@@ -22,9 +22,6 @@ void init_mpv() {
 	}
 	atexit(quit_mpv);
 
-	// Setting properties
-	mpv_set_property_string(mpv, "video", "no");
-
 	// Initializing
 	int err = mpv_initialize(mpv);
 	if (err) {
