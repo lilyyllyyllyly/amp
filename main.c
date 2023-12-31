@@ -9,6 +9,7 @@
 #define SEEK "5" // seconds to seek in song
 
 int wakeup = 0; // When true, mpv event loop will quit
+
 GLFWwindow* win = NULL;
 
 void handle_interrupt(int signal) {
@@ -47,7 +48,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	init_mpv();
-	init_ui(&win);
+	init_ui(&win, get_mpv_handle());
 	glfwSetKeyCallback(win, handle_keyevent);
 
 	// Start playing music file
