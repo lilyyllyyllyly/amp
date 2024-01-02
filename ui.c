@@ -10,6 +10,9 @@
 #define WIDTH  800
 #define HEIGHT 600
 
+#define SIDEBAR_MIN_W 200
+#define SIDEBAR_MIN_H 200
+
 int win_w, win_h; // Width and height of default framebuffer (whole window)
 
 GLuint vid_fbo; // Video framebuffer object (where the mpv video is drawn)
@@ -19,15 +22,18 @@ GLsizei vid_w, vid_h; // Width and height of video framebuffer
 mpv_render_context* res;
 
 void update_vid_size() {
+	int max_space, free_space;
+
 	if (win_w > win_h) {
-		// The window is horizontal, so the video takes as much vertical space as possible
-		vid_h = win_h;
-		vid_w = vid_h;
+		free_space = win_w - SIDEBAR_MIN_W;
+		max_space = win_h;
 	} else {
-		// The window is vertical, so the video takes as much horizontal space as possible
-		vid_w = win_w;
-		vid_h = vid_w;
+		free_space = win_h - SIDEBAR_MIN_H;
+		max_space = win_w;
 	}
+
+	vid_w = free_space > max_space? max_space : free_space;
+	vid_h = vid_w;
 }
 
 void handle_fbresize(GLFWwindow* window, int width, int height) {
@@ -156,7 +162,6 @@ void draw(GLFWwindow* win) {
   	  // - We're reading the contents of the video framebuffer and drawing to the default framebuffer (window)
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, vid_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
 	glViewport(0, 0, win_w, win_h);
 
 	  // - Getting source (video) rectangle that will be drawn
@@ -165,12 +170,25 @@ void draw(GLFWwindow* win) {
 
 	  // - Getting destination (window) rectangle where the video will be drawn (positioned in the top right of the window)
 	GLsizei dst_x = win_w-vid_w, dst_y = win_h-vid_h;
-	GLsizei dst_w = vid_w, dst_h = vid_w;
+	GLsizei dst_w = vid_w, dst_h = vid_h;
 
 	  // - Drawing
 	glBlitFramebuffer(src_x, src_y, src_x+src_w, src_y+src_h,
 			  dst_x, dst_y, dst_x+dst_w, dst_y+dst_h,
 			  GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	// Draw sidebar
+	float bar_w_px = win_w-vid_w, bar_h_px = win_h-vid_h; // Sidebar size in pixels
+	float bar_w = bar_w_px/win_w, bar_h = bar_h_px/win_h; // Sidebar size as percentage of window size
+	
+	bar_w = bar_w * 2 - 1; // Converting range from [0, 1] to [-1, 1] (range used in the viewport by default)
+	bar_h = bar_h * 2 - 1;
+
+	if (win_w > win_h) {
+		glRectf(-1, -1, bar_w, 1);
+	} else {
+		glRectf(-1, -1, 1, bar_h);
+	}
 	//
 
 	glfwSwapBuffers(win);
