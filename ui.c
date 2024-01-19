@@ -5,7 +5,9 @@
 #include <GL/gl.h> // Needed for glext.h
 #include <GL/glext.h> // For framebuffer funtion pointer types, i think it's necessary? idk man opengl is crazy
 #include <GLFW/glfw3.h>
+
 #include <mpv/render_gl.h>
+#include "playlist.h"
 
 #define WIDTH  800
 #define HEIGHT 600
@@ -158,23 +160,33 @@ void draw(GLFWwindow* win) {
 	int err = mpv_render_context_render(res, render_params);
 	if (err) fprintf(stderr, "ERROR: an error occured on mpv_render_context_render. error code %d\n", err);
 
-	// Drawing video framebuffer in window
+	// Draw video framebuffer in window
   	  // - We're reading the contents of the video framebuffer and drawing to the default framebuffer (window)
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, vid_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 	glViewport(0, 0, win_w, win_h);
 
 	  // - Getting source (video) rectangle that will be drawn
-	GLsizei src_x = 0, src_y = 0;
-	GLsizei src_w = vid_w, src_h = vid_h;
+	GLsizei src_x1 = 0, src_y1 = 0;
+	GLsizei src_x2 = vid_w, src_y2 = vid_h;
 
-	  // - Getting destination (window) rectangle where the video will be drawn (positioned in the top right of the window)
-	GLsizei dst_x = win_w-vid_w, dst_y = win_h-vid_h;
-	GLsizei dst_w = vid_w, dst_h = vid_h;
+	  // - Getting destination (window) rectangle where the video will be drawn (centered on the available space)
+	GLsizei dst_x1 = win_w - vid_w, dst_y1 = win_h - vid_h;
+	GLsizei dst_x2 = win_w, dst_y2 = win_h;
+
+	    // - Centering
+	if (win_w > win_h) {
+		dst_y1 /= 2;
+		dst_y2 -= dst_y1;
+	} else {
+		dst_x1 /= 2;
+		dst_x2 -= dst_x1;
+	}
+	  //
 
 	  // - Drawing
-	glBlitFramebuffer(src_x, src_y, src_x+src_w, src_y+src_h,
-			  dst_x, dst_y, dst_x+dst_w, dst_y+dst_h,
+	glBlitFramebuffer(src_x1, src_y1, src_x2, src_y2,
+			  dst_x1, dst_y1, dst_x2, dst_y2,
 			  GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
 	// Draw sidebar
@@ -188,6 +200,13 @@ void draw(GLFWwindow* win) {
 		glRectf(-1, -1, bar_w, 1);
 	} else {
 		glRectf(-1, -1, 1, bar_h);
+	}
+
+	// Draw playlist entries (not actually doing the drawing part yet)
+	int entries;
+	playlist_entry* playlist = get_playlist(&entries);
+	for (int i = 0; i < entries; ++i) {
+		printf("%s %c\n", playlist[i].title, playlist[i].current? '*' : ' ');
 	}
 	//
 
