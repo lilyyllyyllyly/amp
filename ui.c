@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h> // Needed for glext.h
@@ -7,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include <mpv/render_gl.h>
+#include "drawtext.h"
 #include "playlist.h"
 
 #define WIDTH  800
@@ -15,6 +17,21 @@
 #define SIDEBAR_MIN_W 200
 #define SIDEBAR_MIN_H 200
 
+#define ENTRY_H 50 // height of each entry in the playlist
+
+#define FONT_PATH "Renogare-Regular.otf" // temporary (hopefully)
+#define FONT_SIZE 24 // temporary (hopefully)
+
+// Colors (ideally these will be configurable in the future)
+#define BACKGROUND_COLOR 0xFFFFFF
+#define FOREGROUND_COLOR 0x808080
+#define FGSELECTED_COLOR 0x506090
+#define BGSELECTED_COLOR 0xCCCCFF
+#define HEXCOLOR(clr) \
+	(clr >> 2*8) & 0xFF, \
+	(clr >> 1*8) & 0xFF, \
+	(clr >> 0*8) & 0xFF
+
 int win_w, win_h; // Width and height of default framebuffer (whole window)
 
 GLuint vid_fbo; // Video framebuffer object (where the mpv video is drawn)
@@ -22,6 +39,8 @@ GLuint vid_tex; // Texture attachment of video fbo
 GLsizei vid_w, vid_h; // Width and height of video framebuffer
 
 mpv_render_context* res;
+
+struct dtx_font* font;
 
 void update_vid_size() {
 	int max_space, free_space;
@@ -36,6 +55,13 @@ void update_vid_size() {
 
 	vid_w = free_space > max_space? max_space : free_space;
 	vid_h = vid_w;
+
+	// Using pixel coordinates rather than relative (libdrawtext needs it i think)
+	glViewport(0, 0, win_w, win_h);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, win_w, 0, win_h, 0, 1);
 }
 
 void handle_fbresize(GLFWwindow* window, int width, int height) {
@@ -64,6 +90,10 @@ void free_video_fbo() {
 
 void free_video_tex() {
 	glDeleteTextures(1, &vid_tex);
+}
+
+void free_font() {
+	dtx_close_font(font);
 }
 
 void create_video_fbo() {
@@ -133,10 +163,21 @@ void init_ui(GLFWwindow** win, mpv_handle* mpv) {
 
 	// Create mpv render context
 	create_mpv_render(mpv);
+
+	// Setup dtx font
+	if (!(font = dtx_open_font(FONT_PATH, FONT_SIZE))) {
+		fprintf(stderr, "ERROR: failed to load font.");
+		exit(EXIT_FAILURE);
+	}
+	dtx_use_font(font, FONT_SIZE);
+	atexit(free_font);
 }
 
 void draw(GLFWwindow* win) {
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 
 	// Draw mpv video to video framebuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, vid_fbo);
@@ -193,20 +234,44 @@ void draw(GLFWwindow* win) {
 	float bar_w_px = win_w-vid_w, bar_h_px = win_h-vid_h; // Sidebar size in pixels
 	float bar_w = bar_w_px/win_w, bar_h = bar_h_px/win_h; // Sidebar size as percentage of window size
 	
-	bar_w = bar_w * 2 - 1; // Converting range from [0, 1] to [-1, 1] (range used in the viewport by default)
-	bar_h = bar_h * 2 - 1;
+	bar_w = bar_w_px;
+	bar_h = bar_h_px;
 
+	glColor3ub(HEXCOLOR(BACKGROUND_COLOR));
 	if (win_w > win_h) {
-		glRectf(-1, -1, bar_w, 1);
+		glRectf(0, 0, bar_w, win_h);
 	} else {
-		glRectf(-1, -1, 1, bar_h);
+		glRectf(0, 0, win_w, bar_h);
 	}
 
-	// Draw playlist entries (not actually doing the drawing part yet)
+	// Draw playlist entries
 	int entries;
 	playlist_entry* playlist = get_playlist(&entries);
+
+	  // - Moving to the top left of the bar
+	if (win_w > win_h) {
+		glTranslatef(0, win_h, 0);
+	} else {
+		glTranslatef(0, win_h - vid_h, 0);
+	}
+
+	  // - Drawing each entry
 	for (int i = 0; i < entries; ++i) {
-		printf("%s %c\n", playlist[i].title, playlist[i].current? '*' : ' ');
+		// Setting text color
+		if (playlist[i].current) glColor3ub(HEXCOLOR(FGSELECTED_COLOR));
+		else glColor3ub(HEXCOLOR(FOREGROUND_COLOR));
+
+		// Cutting off text if it goes past the end of the bar
+		char* text = playlist[i].title;
+		int chars = strlen(text);
+
+		int max_w = win_w > win_h? win_w-vid_w : win_w;
+		float txt_w = dtx_string_width(text);
+		if (txt_w > max_w) chars = dtx_char_at_pt(text, max_w) - 1;
+
+		// Moving down and drawing text
+		glTranslatef(0, -ENTRY_H, 0);
+		dtx_substring(text, 0, chars);
 	}
 	//
 

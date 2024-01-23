@@ -4,10 +4,10 @@ DEBUG=-fsanitize=address,undefined -g3
 
 SOURCES=main.c mpv.c ui.c playlist.c
 OUTPUT=amp
-LIBS=-lmpv -lglfw -lGL
+LIBS=-lmpv -lglfw -lGL -ldrawtext
 
 final:
-	${COMP} ${OPTIONS} ${LIBS} ${SOURCES} -o ${OUTPUT}
+	${COMP} ${OPTIONS} ${SOURCES} ${LIBS} -o ${OUTPUT}
 
 debug:
-	${COMP} ${OPTIONS} ${LIBS} ${DEBUG} ${SOURCES} -o ${OUTPUT}
+	${COMP} ${OPTIONS} ${DEBUG} ${SOURCES} ${LIBS} -o ${OUTPUT}
